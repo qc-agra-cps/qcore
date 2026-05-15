@@ -1,0 +1,28 @@
+build
+cmake-build-debug
+dist
+qcore.egg-info
+pyqcore.*
+include/decompose/Decompose.hpp
+src/decompose/Decompose.cpp
+.cache/
+
+# IDE files
+.idea/
+.vscode
+
+# Test outputs and binaries
+test/test_resources/output.qasm
+
+# ai
+.roomodes
+.roo/
+.rooignore
+CLAUDE.md
+# .program/
+# .knowledgebase/
+# .architecture-deprecated/
+# .architecture-deprecated2/
+
+# literate programming
+_book/
