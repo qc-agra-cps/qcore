@@ -2,6 +2,8 @@
 
 QCORE: Core Quantum Library
 
+### Introductory Notebook
+   An introduction to QCore's python interface can be found [here](introduction.ipynb)
 
 ### For use in a C++ Project
 
@@ -22,11 +24,4 @@ QCORE: Core Quantum Library
         pip install cmake ninja setuptools setuptools_scm 
 
     4. Install the QCORE tool
-        python3 setup.py  install
-
-    5. Run Python Interpreter
-        >>> from pyqcore import *
-        >>> circuitProperties(read_From_File("<<Path to input Qasm file>>"))
-        >>> writeQASM(read_From_File("<<Path to input Qasm file>>"), "<<Path to output Qasm file>>")
-
-       
+        python3 setup.py install

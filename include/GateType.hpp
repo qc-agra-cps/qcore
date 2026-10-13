@@ -35,12 +35,12 @@ Purpose: Reversible and Quantum GATE Instance Description
 */
 #pragma once
 
+#include <cctype>
 #include <iostream>
 
 #include "Definition.hpp"
 
 namespace qcore {
-
 
 /**
  * @brief Reversible and Quantum Gate Types:
@@ -65,81 +65,109 @@ namespace qcore {
  *      U1, U2, U3 and U
  */
 
-enum GateType : std::uint8_t {  // Gate Type
+enum GateType : std::uint8_t { // Gate Type
     NONE,
 
     // Standard operations
-    I,          //Identity Gate
-    X,          //Inverter, NOT or  Pauli-X Gate
-    CX,         //Controlled-Pauli-X or Feynman Gate 
-    CCX,        //2-Controlled-Pauli-X or Toffoli Gate
-    MCX,        //Multi-Controlled-Pauli-X or Multi-Controlled-Toffoli Gate
+    I,   //Identity Gate
+    X,   //Inverter, NOT or  Pauli-X Gate
+    CX,  //Controlled-Pauli-X or Feynman Gate
+    CCX, //2-Controlled-Pauli-X or Toffoli Gate
+    MCX, //Multi-Controlled-Pauli-X or Multi-Controlled-Toffoli Gate
 
     //Quantum X-axis rotation and phase operations
-    RX,         //Rotation about the X-axis through angle θ 
-    CRX,        //Controlled-RX gate
-    RXX,        //Two-qubit rotation along the X-axis through a specified angle or XX-Ising Gate 
-    RCCX,       //Relative phase Toffoli or Margolus Gate 
-    SRCCX,      //Sub or parts of RCCX Gate: {RCCX(a, b, c) + V(b, c)}  
-    SRCCXDG,    //Inverse of SRCCX gate
-    SSRCCX,     //Type-{b} Special form of RCCX Gate: { RCCX(a, b, c) + V(a, c)}
-    SSRCCXDG,   //Inverse of SSRCCX Gate
-    LCCX,       //Logical AND Gate
-    LCCXDG,     //Inverse of LCCX Gate
-    RC3X,       //3 Controlled relative phase X gate 
-    SRC3X,      //Sub or parts of RC3X Gate: {RC3X(a, b, c, d) + V(b, c, d)}
-    SRC3XDG,    //Inverse SRC3X Gate
+    RX,       //Rotation about the X-axis through angle θ
+    CRX,      //Controlled-RX gate
+    RXX,      //Two-qubit rotation along the X-axis through a specified angle or XX-Ising Gate
+    RCCX,     //Relative phase Toffoli or Margolus Gate
+    SRCCX,    //Sub or parts of RCCX Gate: {RCCX(a, b, c) + V(b, c)}
+    SRCCXDG,  //Inverse of SRCCX gate
+    SSRCCX,   //Type-{b} Special form of RCCX Gate: { RCCX(a, b, c) + V(a, c)}
+    SSRCCXDG, //Inverse of SSRCCX Gate
 
-    V,          //Square-Root-of-Paule-X Gate
-    CV,         //Controlled-V Gate
-    VDG,        //Inverse of V Gate
-    CVDG,       //Congrolled-VDG Gate
-    SX,         //Same as V
-    CSX,        //Same as CV
-    SXDG,       //Same as VDG
-    CSXDG,      //Same as CVDG
-    Y,          //Paule Y Gate
-    CY,         //Controlled-Y Gate 
-    RY,         //Rotation about the Y-axis through angle θ 
-    CRY,        //Controlled-RY gate
-    Z,          //Paule Z Gate
-    CZ,         //Controlled-Z Gate 
-    S,          //Square-Root-of-Paule-Z Gate
-    CS,         //Controlled-S Gate
-    SDG,        //Inverse of S Gate
-    CSDG,       //Controlled-SDG Gate
-    T,          //Square-Root-of-S Gate
-    CT,         //Controlled-T Gate
-    TDG,        //Inverse of T Gate
-    CTDG,       //Controlled-TDG Gate
-    P,          //Equivalent to RZ Gate (up to a phase factor, i.e. P(θ) = e^(iθ/2) RZ(θ), P(θ=π)=Z,  P(θ=π/2)=S, P(θ=π/4)=T)
-    CP,         //Controlled-P Gate 
-    RZ,         //Rotation about the Z-axis through angle θ 
-    CRZ,        //Controlled-RZ Gate  
-    RZZ,        //Two-qubit rotation along the Z-axis through a specified angle (maximally entangling at θ=π/2)
-    H,          //Hadamard Gate
-    CH,         //Controlled-H Gate  
-    U1,         //Similar to P Gate (a deprecated gate from IBM Qiskit, U1(θ) = P(θ) = U(0, 0, θ))
-    CU1,        //Controlled-U1 Gate  
-    U2,         //Single-qubit rotation about the (X + Z) axis (a deprecated gate from IBM Qiskit, U2(ϕ,λ) = U(π/2, ϕ, λ))
-    CU2,        //Controlled-U2 Gate  
-    U3,         //Generic single-qubit rotation Gate with 3 Euler angles (a deprecated gate from IBM Qiskit, U3(θ, ϕ, λ) = U(θ, ϕ, λ))
-    CU3,        //Controlled-U3 Gate
-    U,          //Similar to U3 Gate
-    CU,         //Controlled-U Gate
-    PERES,      //A 3-qubit quantum Gate (realizing: P(a, b, c) -> (a', b', c') such that a' = a, b' = a ⊕ b, c' = (a & b) ⊕ c)  
-    PERESDG,    //Inverse of PERES Gate
-    SWAP,       //A 2-qubit Gate for state exchange
-    CSWAP,      //Controlled-SWAP or Fredkin Gate
-    ISWAP,      //A 2-qubit XX + YY interaction: iSWAP = e^(iπ/4(X ⊗ X + Y ⊗ Y))
-    
+    LCCX,    //Logical AND Gate
+    LCCXDG,  //Inverse of LCCX Gate
+    RC3X,    //3 Controlled relative phase X gate
+    RC3XDG,  //3 Controlled relative phase X gate
+    SRC3X,   //Sub or parts of RC3X Gate: {RC3X(a, b, c, d) + V(b, c, d)}
+    SRC3XDG, //Inverse SRC3X Gate
+
+    RC3XD4,   //3 Controlled relative phase X gate
+    RC3XD4DG, //Inverse RC3XD4 Gate
+    RC3XD4DGDC, //Inverse RC3XD4 Gate + measure
+
+    V,     //Square-Root-of-Paule-X Gate
+    CV,    //Controlled-V Gate
+    VDG,   //Inverse of V Gate
+    CVDG,  //Congrolled-VDG Gate
+    SX,    //Same as V
+    CSX,   //Same as CV
+    SXDG,  //Same as VDG
+    CSXDG, //Same as CVDG
+    Y,     //Paule Y Gate
+    CY,    //Controlled-Y Gate
+    RY,    //Rotation about the Y-axis through angle θ
+    CRY,   //Controlled-RY gate
+    Z,     //Paule Z Gate
+    CZ,    //Controlled-Z Gate
+    CCIZ,  //Doubly-Controlled-iZ Gate (2 controls, 1 target, applies i·Z phase)
+    S,     //Square-Root-of-Paule-Z Gate
+    CS,    //Controlled-S Gate
+    SDG,   //Inverse of S Gate
+    CSDG,  //Controlled-SDG Gate
+    T,     //Square-Root-of-S Gate
+    CT,    //Controlled-T Gate
+    TDG,   //Inverse of T Gate
+    CTDG,  //Controlled-TDG Gate
+    P,     //Equivalent to RZ Gate (up to a phase factor, i.e. P(θ) = e^(iθ/2) RZ(θ), P(θ=π)=Z,  P(θ=π/2)=S, P(θ=π/4)=T)
+    CP,    //Controlled-P Gate
+    RZ,    //Rotation about the Z-axis through angle θ
+    CRZ,   //Controlled-RZ Gate
+    RZZ,   //Two-qubit rotation along the Z-axis through a specified angle (maximally entangling at θ=π/2)
+    H,     //Hadamard Gate
+    CH,    //Controlled-H Gate
+    U1,    //Similar to P Gate (a deprecated gate from IBM Qiskit, U1(θ) = P(θ) = U(0, 0, θ))
+    CU1,   //Controlled-U1 Gate
+    U2,    //Single-qubit rotation about the (X + Z) axis (a deprecated gate from IBM Qiskit, U2(ϕ,λ) = U(π/2, ϕ, λ))
+    CU2,   //Controlled-U2 Gate
+    U3, //Generic single-qubit rotation Gate with 3 Euler angles (a deprecated gate from IBM Qiskit, U3(θ, ϕ, λ) = U(θ, ϕ, λ))
+    CU3,   //Controlled-U3 Gate
+    U,     //Similar to U3 Gate
+    CU,    //Controlled-U Gate
+    PERES, //A 3-qubit quantum Gate (realizing: P(a, b, c) -> (a', b', c') such that a' = a, b' = a ⊕ b, c' = (a & b) ⊕ c)
+    PERESDG, //Inverse of PERES Gate
+    SWAP,    //A 2-qubit Gate for state exchange
+    CSWAP,   //Controlled-SWAP or Fredkin Gate
+    ISWAP,   //A 2-qubit XX + YY interaction: iSWAP = e^(iπ/4(X ⊗ X + Y ⊗ Y))
+
     // Non-unitary operations
     RESET,
     MEASURE,
     IF,
     BARRIER,
-    // Supported Gate Types
-    TYPECOUNT
+    SUBCIRCUIT, // User-defined gate call (holds child QCircuit)
+
+    // Assertions
+    ASSERT_C,
+    ASSERT_S,
+    ASSERT_EQ,
+    ASSERT_PHASE,
+    ASSUME_CLASSIC,
+    ASSUME_PHASE,
+    DECLARE,
+
+    RCCXA,    //T-Depth 1 Relative Phase Toffoli with Ancilla
+    RCCXADG,  //T-Depth 1 Relative Phase Toffoli with Ancilla
+    RCCXADGDC,  //T-Depth 1 Relative Phase Toffoli with Ancilla
+    RCCXD2,   //T-Depth 2 Relative Phase Toffoli
+    RCCXD2DG, //T-Depth 2 Relative Phase Toffoli
+    RCCXD2DGDC, //T-Depth 2 Relative Phase Toffoli
+    RWCCX,    //T-Depth 1 Relative Phase Toffoli with Omega
+    RWCCXDG,  //T-Depth 1 Relative Phase Toffoli with Omega
+    W,        //T-Depth 1 Omega of the lartive phase Toffoli
+    WDG,      //T-Depth 1 Omega of the lartive phase Toffoli
+
+    GATE_TYPE_COUNT
 };
 
 // Flag for classical control gate
@@ -154,7 +182,7 @@ using PropertiesMap = std::map<gate_t, gcount_t>;
 using PropertyIterator = PropertiesMap::iterator;
 using ConstantPropertyIterator = PropertiesMap::const_iterator;
 
-enum RotationType : std::uint8_t {  // Type of explicit rotations
+enum RotationType : std::uint8_t { // Type of explicit rotations
     ROTATENONE,
     THETA,
     PHI,
@@ -172,7 +200,41 @@ using RotationMap = std::map<RotationType, angle_t>;
 using RotationIterator = RotationMap::iterator;
 using ConstantRotationIterator = RotationMap::const_iterator;
 
-inline std::string toString(const rotation_t& rotationType) {
+inline std::string normalizeRotationParameters(const std::string &name) {
+        std::string result = "";
+        for (std::size_t offs = 0; offs < name.size(); ++offs) {
+            switch (name[offs]) {
+                case '[':
+                    result += "_";
+                    break;
+                case ']':
+                    break;
+                default:
+                    result += name[offs];
+            }
+        }
+        return result;
+}
+
+inline std::vector<std::string> getNormalizedRotationParameters(const std::string &rotation) {
+    std::vector<std::string> parameters;
+    auto is_formula = [](char c) {
+		return std::isspace(c) || std::isdigit(c) || c == '.' || c == '-' || c == '+' || c == '*' || c == '/';
+    };
+    for (std::size_t offset = 0; offset < rotation.size(); ++offset) {
+        if (is_formula(rotation[offset])) continue;
+        std::size_t start = offset;
+        while (offset < rotation.size() && !is_formula(rotation[offset])) offset++;
+        std::string parameter = rotation.substr(start, offset);
+        if (parameter == "pi") continue;
+		auto normalized = normalizeRotationParameters(parameter);
+        if (normalized.empty()) continue;
+        parameters.emplace_back(normalized);
+    }
+    return parameters;
+}
+
+inline std::string toString(const rotation_t &rotationType) {
     switch (rotationType) {
         case RotationType::ROTATENONE:
             return "none";
@@ -189,11 +251,11 @@ inline std::string toString(const rotation_t& rotationType) {
     }
 }
 
-inline std::string toString(const gate_t& gateType) {
+inline std::string toString(const gate_t &gateType) {
     switch (gateType) {
         case GateType::NONE:
             return "none";
-        
+
         // Standard operations
         case GateType::I:
             return "id";
@@ -205,7 +267,7 @@ inline std::string toString(const gate_t& gateType) {
             return "ccx";
         case GateType::MCX:
             return "mcx";
-        
+
         //Quantum X-axis rotation and phase operations
         case GateType::RX:
             return "rx";
@@ -222,17 +284,25 @@ inline std::string toString(const gate_t& gateType) {
         case GateType::SSRCCX:
             return "ssrccx";
         case GateType::SSRCCXDG:
-            return "ssrccxdg";           
+            return "ssrccxdg";
         case GateType::LCCX:
-            return "lccx"; 
+            return "lccx";
         case GateType::LCCXDG:
-            return "lccxdg"; 
+            return "lccxdg";
         case GateType::RC3X:
             return "rc3x";
+        case GateType::RC3XDG:
+            return "rc3xdg";
         case GateType::SRC3X:
             return "src3x";
         case GateType::SRC3XDG:
             return "src3xdg";
+        case GateType::RC3XD4:
+            return "rc3xd4";
+        case GateType::RC3XD4DG:
+            return "rc3xd4dg";
+		case GateType::RC3XD4DGDC:
+            return "rc3xd4dgdc";
         case GateType::V:
             return "v";
         case GateType::CV:
@@ -261,6 +331,8 @@ inline std::string toString(const gate_t& gateType) {
             return "z";
         case GateType::CZ:
             return "cz";
+        case GateType::CCIZ:
+            return "cciz";
         case GateType::S:
             return "s";
         case GateType::CS:
@@ -268,7 +340,7 @@ inline std::string toString(const gate_t& gateType) {
         case GateType::SDG:
             return "sdg";
         case GateType::CSDG:
-            return "csdg";
+            return "ctrl @ inv @ s";
         case GateType::T:
             return "t";
         case GateType::CT:
@@ -325,8 +397,44 @@ inline std::string toString(const gate_t& gateType) {
             return "if";
         case GateType::BARRIER:
             return "barrier";
+        case GateType::SUBCIRCUIT:
+            return "subcircuit";
+        case GateType::ASSERT_C:
+            return "assert_c";
+        case GateType::ASSERT_S:
+            return "assert_s";
+        case GateType::ASSERT_EQ:
+            return "assert_eq";
+        case GateType::ASSERT_PHASE:
+            return "assert_phase";
+        case GateType::ASSUME_CLASSIC:
+            return "assume_classic";
+        case GateType::ASSUME_PHASE:
+            return "assume_phase";
+        case GateType::DECLARE:
+            return "declare";
+        case GateType::RCCXA:
+            return "rccxa";
+        case GateType::RCCXADG:
+            return "rccxadg";
+        case GateType::RCCXADGDC:
+            return "rccxadgdc";
+        case GateType::RCCXD2:
+            return "rccxd2";
+        case GateType::RCCXD2DG:
+            return "rccxd2dg";
+        case GateType::RCCXD2DGDC:
+            return "rccxd2dgdc";
+        case GateType::RWCCX:
+            return "rwccx";
+        case GateType::RWCCXDG:
+            return "rwccxdg";
+        case GateType::W:
+            return "w";
+        case GateType::WDG:
+            return "wdg";
         default:
-            throw std::invalid_argument("Invalid OpType!");
+            throw std::invalid_argument("Invalid OpType: " + std::to_string(gateType) + "!");
     }
 }
 
@@ -336,7 +444,7 @@ inline std::string toString(const gate_t& gateType) {
  * @param gateType The gateType identifier for the given quantum gate type  
  * @return gate_t The inverse quantum gate type
  */
-inline gate_t inverseGateType(const gate_t& gateType) {
+inline gate_t inverseGateType(const gate_t &gateType) {
     switch (gateType) {
         case GateType::SRCCX:
             return GateType::SRCCXDG;
@@ -353,7 +461,7 @@ inline gate_t inverseGateType(const gate_t& gateType) {
         case GateType::LCCX:
             return GateType::LCCXDG;
         case GateType::LCCXDG:
-            return GateType::LCCX;   
+            return GateType::LCCX;
         case GateType::V:
             return GateType::VDG;
         case GateType::VDG:
@@ -361,7 +469,7 @@ inline gate_t inverseGateType(const gate_t& gateType) {
         case GateType::CV:
             return GateType::CVDG;
         case GateType::CVDG:
-            return GateType::CV;    
+            return GateType::CV;
         case GateType::SX:
             return GateType::SXDG;
         case GateType::SXDG:
@@ -390,7 +498,39 @@ inline gate_t inverseGateType(const gate_t& gateType) {
             return GateType::PERESDG;
         case GateType::PERESDG:
             return GateType::PERES;
-        
+
+        case GateType::RCCXA:
+            return GateType::RCCXADG;
+        case GateType::RCCXADG:
+            return GateType::RCCXA;
+        case GateType::RCCXADGDC:
+            return GateType::RCCXA;
+        case GateType::RCCXD2:
+            return GateType::RCCXD2DG;
+        case GateType::RCCXD2DG:
+            return GateType::RCCXD2;
+        case GateType::RCCXD2DGDC:
+            return GateType::RCCXD2;
+        case GateType::RWCCX:
+            return GateType::RWCCXDG;
+        case GateType::RWCCXDG:
+            return GateType::RWCCX;
+        case GateType::W:
+            return GateType::WDG;
+        case GateType::WDG:
+            return GateType::W;
+
+        case GateType::RC3X:
+            return GateType::RC3XDG;
+        case GateType::RC3XDG:
+            return GateType::RC3X;
+        case GateType::RC3XD4:
+            return GateType::RC3XD4DG;
+        case GateType::RC3XD4DG:
+            return GateType::RC3XD4;
+        case GateType::RC3XD4DGDC:
+            return GateType::RC3XD4;
+
         //Self Inverse
         case GateType::NONE:
         case GateType::I:
@@ -402,7 +542,6 @@ inline gate_t inverseGateType(const gate_t& gateType) {
         case GateType::CRX:
         case GateType::RXX:
         case GateType::RCCX:
-        case GateType::RC3X:
         case GateType::Y:
         case GateType::CY:
         case GateType::RY:
@@ -431,13 +570,21 @@ inline gate_t inverseGateType(const gate_t& gateType) {
         case GateType::MEASURE:
         case GateType::IF:
         case GateType::BARRIER:
+        case GateType::SUBCIRCUIT:
+        case GateType::ASSERT_C:
+        case GateType::ASSERT_S:
+        case GateType::ASSERT_PHASE:
+        case GateType::ASSERT_EQ:
+        case GateType::ASSUME_CLASSIC:
+        case GateType::ASSUME_PHASE:
+        case GateType::DECLARE:
             return gateType;
         default:
             throw std::invalid_argument("Invalid OpType!");
     }
 }
 
-inline gate_t gateTypeFromString(const std::string& gateType) {
+inline gate_t gateTypeFromString(const std::string &gateType) {
     if (gateType == "none" || gateType == "0") {
         return GateType::NONE;
     }
@@ -537,106 +684,133 @@ inline gate_t gateTypeFromString(const std::string& gateType) {
     if (gateType == "cz" || gateType == "32") {
         return GateType::CZ;
     }
-    if (gateType == "s" || gateType == "33") {
+    if (gateType == "cciz" || gateType == "33") {
+        return GateType::CCIZ;
+    }
+    if (gateType == "s" || gateType == "34") {
         return GateType::S;
     }
-    if (gateType == "cs" || gateType == "34") {
+    if (gateType == "cs" || gateType == "35") {
         return GateType::CS;
     }
-    if (gateType == "sdg" || gateType == "35") {
+    if (gateType == "sdg" || gateType == "36") {
         return GateType::SDG;
     }
-    if (gateType == "csdg" || gateType == "36") {
+    if (gateType == "csdg" || gateType == "37") {
         return GateType::CSDG;
     }
-    if (gateType == "t" || gateType == "37") {
+    if (gateType == "t" || gateType == "38") {
         return GateType::T;
     }
-    if (gateType == "ct" || gateType == "38") {
+    if (gateType == "ct" || gateType == "39") {
         return GateType::CT;
     }
-    if (gateType == "tdg" || gateType == "39") {
+    if (gateType == "tdg" || gateType == "40") {
         return GateType::TDG;
     }
-    if (gateType == "ctdg" || gateType == "40") {
+    if (gateType == "ctdg" || gateType == "41") {
         return GateType::CTDG;
     }
-    if (gateType == "p" || gateType == "41") {
+    if (gateType == "p" || gateType == "42") {
         return GateType::P;
     }
-    if (gateType == "cp" || gateType == "42") {
+    if (gateType == "cp" || gateType == "43") {
         return GateType::CP;
     }
-    if (gateType == "rz" || gateType == "43") {
+    if (gateType == "rz" || gateType == "44") {
         return GateType::RZ;
     }
-    if (gateType == "crz" || gateType == "44") {
+    if (gateType == "crz" || gateType == "45") {
         return GateType::CRZ;
     }
-    if (gateType == "rzz" || gateType == "45") {
+    if (gateType == "rzz" || gateType == "46") {
         return GateType::RZZ;
     }
-    if (gateType == "h" || gateType == "46") {
+    if (gateType == "h" || gateType == "47") {
         return GateType::H;
     }
-    if (gateType == "ch" || gateType == "47") {
+    if (gateType == "ch" || gateType == "48") {
         return GateType::CH;
     }
-    if (gateType == "u1" || gateType == "48") {
+    if (gateType == "u1" || gateType == "49") {
         return GateType::U1;
     }
-    if (gateType == "cu1" || gateType == "49") {
+    if (gateType == "cu1" || gateType == "50") {
         return GateType::CU1;
     }
-    if (gateType == "u2" || gateType == "50") {
+    if (gateType == "u2" || gateType == "51") {
         return GateType::U2;
     }
-    if (gateType == "cu2" || gateType == "51") {
+    if (gateType == "cu2" || gateType == "52") {
         return GateType::CU2;
     }
-    if (gateType == "u3" || gateType == "52") {
+    if (gateType == "u3" || gateType == "53") {
         return GateType::U3;
     }
-    if (gateType == "cu3" || gateType == "53") {
+    if (gateType == "cu3" || gateType == "54") {
         return GateType::CU3;
     }
-    if (gateType == "u" || gateType == "54") {
+    if (gateType == "u" || gateType == "55") {
         return GateType::U;
     }
-    if (gateType == "cu" || gateType == "55") {
+    if (gateType == "cu" || gateType == "56") {
         return GateType::CU;
     }
-    if (gateType == "peres" || gateType == "56") {
+    if (gateType == "peres" || gateType == "57") {
         return GateType::PERES;
     }
-    if (gateType == "peresdg" || gateType == "57") {
+    if (gateType == "peresdg" || gateType == "58") {
         return GateType::PERESDG;
     }
-    if (gateType == "swap" || gateType == "58") {
+    if (gateType == "swap" || gateType == "59") {
         return GateType::SWAP;
     }
-    if (gateType == "cswap" || gateType == "59") {
+    if (gateType == "cswap" || gateType == "60") {
         return GateType::CSWAP;
     }
-    if (gateType == "iswap" || gateType == "60") {
+    if (gateType == "iswap" || gateType == "61") {
         return GateType::ISWAP;
     }
-    if (gateType == "reset" || gateType == "61") {
+    if (gateType == "reset" || gateType == "62") {
         return GateType::RESET;
     }
-    if (gateType == "measure" || gateType == "62") {
+    if (gateType == "measure" || gateType == "63") {
         return GateType::MEASURE;
     }
-    if (gateType == "if" || gateType == "63") {
+    if (gateType == "if" || gateType == "64") {
         return GateType::IF;
     }
-    if (gateType == "barrier" || gateType == "64") {
+    if (gateType == "barrier" || gateType == "65") {
         return GateType::BARRIER;
+    }
+    if (gateType == "subcircuit" || gateType == "66") {
+        return GateType::SUBCIRCUIT;
+    }
+    if (gateType == "assert_c" || gateType == "68") {
+        return GateType::ASSERT_C;
+    }
+    if (gateType == "assert_s" || gateType == "69") {
+        return GateType::ASSERT_S;
+    }
+    if (gateType == "assert_eq" || gateType == "70") {
+        return GateType::ASSERT_EQ;
+    }
+    if (gateType == "assert_phase" || gateType == "71") {
+        return GateType::ASSERT_PHASE;
+    }
+    if (gateType == "assume_classic" || gateType == "72") {
+        return GateType::ASSUME_CLASSIC;
+    }
+    if (gateType == "assume_phase" || gateType == "73") {
+        return GateType::ASSUME_PHASE;
+    }
+    if (gateType == "declare" || gateType == "74") {
+        return GateType::DECLARE;
     }
     throw std::invalid_argument("Unknown operation type: " + gateType);
 }
 
-inline std::istream& operator>>(std::istream& in, gate_t& gateType) {
+inline std::istream &operator>>(std::istream &in, gate_t &gateType) {
     std::string token;
     in >> token;
 
@@ -649,9 +823,9 @@ inline std::istream& operator>>(std::istream& in, gate_t& gateType) {
     return in;
 }
 
-inline std::ostream& operator<<(std::ostream& out, gate_t& gateType) {
+inline std::ostream &operator<<(std::ostream &out, gate_t &gateType) {
     out << toString(gateType);
     return out;
 }
 
-}  // namespace qcore
+} // namespace qcore

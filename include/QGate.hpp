@@ -33,7 +33,8 @@
 
 namespace qcore {
 
-
+// Forward declaration for subcircuit support
+class QCircuit;
 
 /**
  * @brief To compare two quantum gates for distinguising them
@@ -63,8 +64,11 @@ class QGate {
     TargetSet targets{};
     RotationMap angles{};
     CbitSet cbits{};
-    is_classical flag;
-    expression_t expression{};
+    ClassicalCondition classical{};
+    std::string custom_gate_name{};
+    std::vector<std::string> call_params{};
+    std::shared_ptr<QCircuit> subcircuit{nullptr};
+    AssertionInfo assertion;
 
    public:
    /**
@@ -124,17 +128,24 @@ class QGate {
      */
     QGate inverse();
 
-    std::string toOpenQASM();
+    std::string toOpenQASM(const std::vector<std::string>& qargs = {});
 
-    std::string toString(const FileFormat &format);
+    std::string toOpenQASM3();
+
+    std::string toString(const FileFormat &format, const std::vector<std::string>& qargs = {});
 
     std::string operator[](const FileFormat &format);
 
-    inline void setIsClassical(const is_classical &flag) { this->flag = flag; }
-
-    inline void setExpression(const expression_t &expression) {
-        this->expression = expression;
+    inline void setClassical(const unsigned value, const ConditionType &type=eq, const std::string &cbit="c") {
+        this->classical = ClassicalCondition{type, cbit, value};
     }
+    inline void setClassical(const ClassicalCondition &condition) {
+        this->classical = condition;
+    }
+
+    inline ClassicalCondition getClassical() const { return this->classical; }
+
+    inline is_classical isClassical() const { return this->classical.type != invalid; }
 
     inline gate_t getType() { return this->gate_type; }
 
@@ -148,9 +159,13 @@ class QGate {
 
     inline CbitSet &getCbits() { return this->cbits; }
 
-    inline is_classical &getIsClassical() { return this->flag; }
-
-    inline expression_t &setExpression() { return this->expression; }
+    inline const std::string& getCustomGateName() const { return this->custom_gate_name; }
+    inline void setCustomGateName(const std::string& name) { this->custom_gate_name = name; }
+    inline const std::vector<std::string>& getCallParams() const { return this->call_params; }
+    inline void setCallParams(const std::vector<std::string>& params) { this->call_params = params; }
+    inline std::shared_ptr<QCircuit> getSubcircuit() const { return this->subcircuit; }
+    inline void setSubcircuit(std::shared_ptr<QCircuit> sc) { this->subcircuit = std::move(sc); }
+    inline bool isSubcircuit() const { return this->gate_type == GateType::SUBCIRCUIT; }
 
     void updateBits(const ControlSet &controls, const TargetSet &targets);
 
@@ -160,6 +175,22 @@ class QGate {
     void updateBits(const TargetSet &targets);
 
     void updateBits(const CbitSet &cbits, const TargetSet &targets);
+    void setCbits(const CbitSet &cbits);
+
+    void setAssertionInfo(AssertionInfo &info) {
+        this->assertion = info;
+    }
+
+    AssertionInfo& getAssertionInfo() {
+        return this->assertion;
+    }
+
+    bool isAssertion() {
+        return this->assertion.isValid() && !this->assertion.isAssumption();
+    }
+    bool isAssumption() {
+        return this->assertion.isValid() && this->assertion.isAssumption();
+    }
 
 };
 }  // namespace qcore

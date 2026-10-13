@@ -45,7 +45,7 @@ QGate::QGate(const gate_t &gate_type, gsize_t gate_size, const TargetSet &target
     if (controls.size() + targets.size() != gate_size) {
         throw QcoreException("[QGate] instantiation error msg: Gate size mismatch");
     }
-    this->flag = false;
+    this->classical = ClassicalCondition{};
     this->gate_id = ++gate_count;
     this->gate_type = gate_type;
     this->gate_size = gate_size;
@@ -60,7 +60,7 @@ QGate::QGate(const gate_t &gate_type, gsize_t gate_size, const CbitSet &cbits, c
         throw QcoreException("[QGate] instantiation error msg: Gate size mismatch");
     }
 
-    this->flag = false;
+    this->classical = ClassicalCondition{};
     this->gate_id = ++gate_count;
     this->gate_type = gate_type;
     this->gate_size = gate_size;
@@ -74,7 +74,7 @@ QGate::QGate(const gate_t &gate_type, gsize_t gate_size, const RotationMap &angl
     if (controls.size() + targets.size() != gate_size) {
         throw QcoreException("[QGate] instantiation error msg: Gate size mismatch");
     }
-    this->flag = false;
+    this->classical = ClassicalCondition{};
     this->gate_id = ++gate_count;
     this->gate_type = gate_type;
     this->gate_size = gate_size;
@@ -88,7 +88,7 @@ QGate::QGate(const gate_t &gate_type, gsize_t gate_size, const CbitSet &cbits, c
     if (controls.size() + targets.size() != gate_size) {
         throw QcoreException("[QGate] instantiation error msg: Gate size mismatch");
     }
-    this->flag = false;
+    this->classical = ClassicalCondition{};
     this->gate_id = ++gate_count;
     this->gate_type = gate_type;
     this->gate_size = gate_size;
@@ -102,7 +102,7 @@ QGate::QGate(const gate_t &gate_type, gsize_t gate_size, const ControlSet &contr
     if (controls.size() + targets.size() != gate_size) {
         throw QcoreException("[QGate] instantiation error msg: Gate size mismatch");
     }
-    this->flag = false;
+    this->classical = ClassicalCondition{};
     this->gate_id = ++gate_count;
     this->gate_type = gate_type;
     this->gate_size = gate_size;
@@ -116,7 +116,7 @@ QGate::QGate(const gate_t &gate_type, gsize_t gate_size, const CbitSet &cbits, c
     if (controls.size() + targets.size() != gate_size) {
         throw QcoreException("[QGate] instantiation error msg: Gate size mismatch");
     }
-    this->flag = false;
+    this->classical = ClassicalCondition{};
     this->gate_id = ++gate_count;
     this->gate_type = gate_type;
     this->gate_size = gate_size;
@@ -130,7 +130,7 @@ QGate::QGate(const gate_t &gate_type, gsize_t gate_size, const RotationMap &angl
     if (controls.size() + targets.size() != gate_size) {
         throw QcoreException("[QGate] instantiation error msg: Gate size mismatch");
     }
-    this->flag = false;
+    this->classical = ClassicalCondition{};
     this->gate_id = ++gate_count;
     this->gate_type = gate_type;
     this->gate_size = gate_size;
@@ -144,7 +144,7 @@ QGate::QGate(const gate_t &gate_type, gsize_t gate_size, const CbitSet &cbits, c
     if (controls.size() + targets.size() != gate_size) {
         throw QcoreException("[QGate] instantiation error msg: Gate size mismatch");
     }
-    this->flag = false;
+    this->classical = ClassicalCondition{};
     this->gate_id = ++gate_count;
     this->gate_type = gate_type;
     this->gate_size = gate_size;
@@ -156,7 +156,7 @@ QGate::QGate(const gate_t &gate_type, gsize_t gate_size, const CbitSet &cbits, c
 
 // copy gate
 QGate::QGate(const QGate &g) {
-    this->flag = g.flag;
+    this->classical = g.classical;
     this->gate_id = g.gate_id;
     this->gate_type = g.gate_type;
     this->gate_size = g.gate_size;
@@ -164,17 +164,33 @@ QGate::QGate(const QGate &g) {
     this->controls = g.controls;
     this->targets = g.targets;
     this->cbits = g.cbits;
+    this->custom_gate_name = g.custom_gate_name;
+    this->call_params = g.call_params;
+    this->subcircuit = g.subcircuit;
+    this->assertion = g.assertion;
 }
 
 QGate QGate::inverse(){
     auto gate = QGate{*this}; 
     gate.gate_type = inverseGateType(gate.gate_type);
     //Rotations and other parameterized gates need to be specified
+    if(gate.angles.count(THETA)) {
+        gate.angles[THETA] = "-("+gate.angles[THETA]+")";
+    }
+    if(gate.angles.count(PHI)) {
+        gate.angles[PHI] = "-("+gate.angles[PHI]+")";
+    }
+    if(gate.angles.count(LAMBDA)) {
+        gate.angles[LAMBDA] = "-("+gate.angles[LAMBDA]+")";
+    }
+    if(gate.angles.count(GAMMA)) {
+        gate.angles[GAMMA] = "-("+gate.angles[GAMMA]+")";
+    }
     return gate;
 }
 
 QGate &QGate::operator=(const QGate &g) {
-    this->flag = g.flag;
+    this->classical = g.classical;
     this->gate_id = g.gate_id;
     this->gate_type = g.gate_type;
     this->gate_size = g.gate_size;
@@ -182,6 +198,9 @@ QGate &QGate::operator=(const QGate &g) {
     this->controls = g.controls;
     this->targets = g.targets;
     this->cbits = g.cbits;
+    this->custom_gate_name = g.custom_gate_name;
+    this->call_params = g.call_params;
+    this->subcircuit = g.subcircuit;
     return *this;
 }
 
@@ -189,9 +208,9 @@ std::string QGate::operator[](const FileFormat &format) {
     return this->toString(format);
 }
 
-std::string QGate::toString(const FileFormat &format) {
+std::string QGate::toString(const FileFormat &format, const std::vector<std::string>& qargs) {
     if (format == FileFormat::OpenQASM) {
-        return toOpenQASM();
+        return toOpenQASM(qargs);
     } else {
         throw QcoreException("[toString] format " + qcore::toString(format) + " not recognized");
     }
@@ -215,6 +234,10 @@ void QGate::updateBits(const TargetSet &targets) {
 void QGate::updateBits(const CbitSet &cbits, const TargetSet &targets) {
     this->cbits = cbits;
     this->targets = targets;
+}
+
+void QGate::setCbits(const CbitSet &cbits) {
+    this->cbits = cbits;
 }
 
 }  // namespace qcore

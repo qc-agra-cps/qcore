@@ -28,6 +28,8 @@
 
 
 #include "QCircuit.hpp"
+#include "GateLibrary.hpp"
+#include <algorithm>
 
 namespace qcore {
 
@@ -64,37 +66,66 @@ void QCircuit::clone(const QCircuit& ckt) {
     init();
 
     this->qreg = ckt.qreg;
-    this->qreg = ckt.creg;
+    this->creg = ckt.creg;
     this->max_gate_size = ckt.max_gate_size;
     this->qubits = ckt.qubits;
     this->cbits = ckt.cbits;
     this->depth = ckt.depth;
     this->properties = ckt.properties;
+    this->source_format_ = ckt.source_format_;
+    this->gate_definitions = ckt.gate_definitions;
+    this->gate_def_text = ckt.gate_def_text;
+    this->gate_library_ = ckt.gate_library_;
+    this->max_ancilla = ckt.max_ancilla;
 
     for (ConstantQGateIterator g = ckt.gates.begin(); g != ckt.gates.end(); ++g) {
         this->gates.push_back(QGatePtr(new QGate(**g)));
     }
 }
 
+void QCircuit::cloneEmpty(const QCircuit& ckt) {
+    init();
+
+    this->qreg = ckt.qreg;
+    this->creg = ckt.creg;
+    this->max_gate_size = ckt.max_gate_size;
+    this->qubits = ckt.qubits;
+    this->cbits = ckt.cbits;
+    this->depth = ckt.depth;
+    this->properties = ckt.properties;
+    this->source_format_ = ckt.source_format_;
+    this->gate_definitions = ckt.gate_definitions;
+    this->gate_def_text = ckt.gate_def_text;
+    this->gate_library_ = ckt.gate_library_;
+    this->max_ancilla = ckt.max_ancilla;
+}
+
 void QCircuit::init() {
     this->qreg = 0;
-    this->qreg = 0;
+    this->creg = 0;
     this->max_gate_size = 0;
     this->qubits = QubitSet{};
     this->cbits = CbitSet{};
     this->gates = QGateSet{};
     this->depth = QubitDepthMap{};
     this->properties = PropertiesMap{};
+    this->gate_definitions = {};
+    this->gate_def_text = {};
+    this->gate_library_ = nullptr;
+    this->max_ancilla = 0;
+
 }
 
 std::string QCircuit::toString(const FileFormat& format) {
-    if (format == FileFormat::OpenQASM) {
-        auto os = std::ostringstream();
+    auto os = std::ostringstream();
+    if (format == FileFormat::OpenQASM3) {
+        this->writeQASM3(os);
+    } else if (format == FileFormat::OpenQASM) {
         this->writeQASM(os);
-        return os.str();
     } else {
         throw QcoreException("[toString] format " + qcore::toString(format) + " not recognized");
     }
+    return os.str();
 }
 
 std::string QCircuit::operator[](const FileFormat& format) {
@@ -133,6 +164,17 @@ void QCircuit::addQCircuit(QCircuit qc, QubitSet qubits){
     
     addQCircuit(qc);
 
+    for (const auto& q : qc.getCbits()) {
+        this->cbits.push_back(q);
+    }
+    std::sort(this->cbits.begin(), this->cbits.end());
+    this->cbits.erase(std::unique(this->cbits.begin(), this->cbits.end()), this->cbits.end());
+    if (this->cbits.empty()) {
+		this->creg = 0;        
+	} else {
+		this->creg = *std::max_element(this->cbits.begin(), this->cbits.end()) + 1;
+	}
+
     if (qubits.size() != 0){
         moveQubits(this->qubits, qubits);
     }
@@ -148,6 +190,75 @@ void QCircuit::addQCircuit(const QCircuit qc, int s, int e){
     }
 }
 
+void QCircuit::addQCircuit(QCircuit qc, ClassicalCondition cond) {
+    for (auto &gate : qc.getGates()) {
+        if (gate->isClassical()) {
+            throw QcoreException("[addQCircuit] adding a classical condition to a conditioned circuit.");
+        }
+        gate->setClassical(cond);
+        // gate->setClassical(true);
+    }
+    this->addQCircuit(qc);
+}
+
+void QCircuit::setGateLibrary(std::shared_ptr<GateLibrary> lib) {
+    this->gate_library_ = std::move(lib);
+}
+
+void QCircuit::defineGate(const std::string& name, std::shared_ptr<QCircuit> body) {
+    this->gate_definitions[name] = std::move(body);
+}
+
+void QCircuit::addSubcircuitGate(const std::string& name, const QubitSet& qubits, bool inverse, const ClassicalCondition& cond) {
+    // Look up in per-instance definitions first
+    std::shared_ptr<QCircuit> body;
+    auto it = this->gate_definitions.find(name);
+    if (it != this->gate_definitions.end()) {
+        body = it->second;
+    } else if (this->gate_library_) {
+        body = this->gate_library_->findCompiledGate(name);
+    }
+    if (!body) {
+	  std::cout << "defined gates:\n";
+	  for(auto const &d:this->gate_definitions) { std::cout << "defined: [" << d.first << "]\n"; }
+        throw QcoreException("[addSubcircuitGate] undefined gate: " + name);
+    }
+
+    std::string use_name = name;
+    // inverse if necessary
+    if(inverse) {
+        body = std::make_shared<QCircuit>(body->inverse());
+        use_name += "_inverse";
+        defineGate(use_name, body);
+        auto txtdef_it = this->gate_def_text.find(name);
+        if(txtdef_it == this->gate_def_text.end()) {
+            // throw QcoreException("[addSubcircuitGate] undefined gate: " + name);
+			defineGateTxt(use_name, {.name = "todo"});
+        } else {
+			defineGateTxt(use_name, txtdef_it->second);
+		}
+    }
+    gsize_t gsize = static_cast<gsize_t>(qubits.size());
+    TargetSet targets(qubits.begin(), qubits.end());
+    auto gatePtr = QGatePtr(new QGate(GateType::SUBCIRCUIT, gsize, ControlSet{}, targets));
+    gatePtr->setCustomGateName(use_name);
+    gatePtr->setSubcircuit(body);
+
+    if (cond.isActive()) {
+        gatePtr->setClassical(cond);
+    }
+    if (this->max_gate_size < gsize) {
+        this->max_gate_size = gsize;
+    }
+    if (this->properties.find(GateType::SUBCIRCUIT) == this->properties.end()) {
+        this->properties[GateType::SUBCIRCUIT] = 1;
+    } else {
+        this->properties[GateType::SUBCIRCUIT] += 1;
+    }
+
+    this->gates.push_back(std::move(gatePtr));
+}
+
 void QCircuit::setQubits(const QubitSet& qubits) {
     for (const auto& q : qubits) {
         this->qubits.push_back(q);
@@ -155,11 +266,16 @@ void QCircuit::setQubits(const QubitSet& qubits) {
     //removing duplicates
     std::sort(this->qubits.begin(), this->qubits.end());
     this->qubits.erase(std::unique(this->qubits.begin(), this->qubits.end()), this->qubits.end());
-    this->qreg = this->qubits.size();
+    if (this->qubits.empty()) {
+		this->qreg = 0;        
+	} else {
+		this->qreg = *std::max_element(this->qubits.begin(), this->qubits.end()) + 1;
+	}
 }
 QCircuit QCircuit::inverse(){
     auto qc = QCircuit{};
-    qc.setQubits(this->qubits);
+    qc.clone(*this);
+    qc.gates.clear();
     qc.gates.reserve(this->gates.size());
     for (auto i = this->gates.rbegin(); i != this->gates.rend(); ++i){
         qc.addQGate(static_cast<QGate&>(**i).inverse());
@@ -176,16 +292,19 @@ FileFormat QCircuit::writeQCircuit(const std::string& filename) {
 
     if (extension == "qasm") {
         auto ofs = std::ofstream(filename);
-        
+
         if (!ofs.good()) {
             throw QcoreException("[writeQCircuit] unable to open file " + filename);
         }
-        
-        writeQASM(ofs);
+
+        if (source_format_ == FileFormat::OpenQASM3)
+            writeQASM3(ofs);
+        else
+            writeQASM(ofs);
 
         ofs.close();
 
-        return FileFormat::OpenQASM;
+        return source_format_;
     }
 
     /*
@@ -213,11 +332,31 @@ FileFormat QCircuit::readQCircuit(const std::string& filename) {
             throw QcoreException("[readQCircuit] unable to open file " + filename);
         }
 
-        readQASM(ifs);
-        
+        // Detect QASM version from the first line and dispatch to the right parser
+        std::string first_line;
+        std::getline(ifs, first_line);
+        ifs.seekg(0);
+
+        bool use_qasm3 = false;
+        const std::string qasm_key = "OPENQASM";
+        auto kpos = first_line.find(qasm_key);
+        if (kpos != std::string::npos) {
+            auto start = first_line.find_first_of("0123456789", kpos + qasm_key.size());
+            if (start != std::string::npos && std::stod(first_line.substr(start)) >= 3.0)
+                use_qasm3 = true;
+        }
+
+        if (use_qasm3) {
+            readQASM3(ifs);
+            source_format_ = FileFormat::OpenQASM3;
+        } else {
+            readQASM(ifs);
+            source_format_ = FileFormat::OpenQASM;
+        }
+
         ifs.close();
 
-        return FileFormat::OpenQASM;
+        return source_format_;
     }
 
     /*
@@ -276,5 +415,33 @@ void moveQubits(QubitSet &dest, QubitSet &src){
 void moveQGates(QGateSet& dest, QGateSet& src) {
     dest.reserve(dest.size() + src.size());
     std::move(std::make_move_iterator(src.begin()), std::make_move_iterator(src.end()), std::back_inserter(dest));
+}
+
+// ───────────── Add a gate to the circuit ─────────────
+void addGate(gate_t type, gsize_t size, const CbitSet& cbits,
+                 const RotationMap& angles, const ControlSet& controls,
+                 const TargetSet& targets, const ClassicalCondition& cond,
+                 AssertionInfo& assertion, QCircuit &circuit) {
+    auto gatePtr = QGatePtr(new QGate(type, size, cbits, angles, controls, targets));
+
+
+    if (cond.isActive()) {
+        gatePtr->setClassical(cond);
+    }
+
+    // update circuit stats
+    if (circuit.getMaxGateSize() < size) {
+        circuit.setMaxGateSize(size);
+    }
+
+    if (circuit.getProperties().find(type) == circuit.getProperties().end()) {
+        circuit.setProperty(type, 1);
+    } else {
+        circuit.setProperty(type, circuit.getProperty(type)+1);
+    }
+
+    gatePtr->setAssertionInfo(assertion);
+
+    circuit.addGate(gatePtr);
 }
 }  // namespace qcore

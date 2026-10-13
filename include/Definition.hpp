@@ -36,6 +36,7 @@
 #include <regex>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 #include <unordered_map>
 #include <string>
@@ -141,6 +142,7 @@ class QcoreException : public std::invalid_argument {
 enum class FileFormat {
     Real,
     OpenQASM,
+    OpenQASM3,
     FormatCount
 };
 
@@ -215,10 +217,12 @@ inline std::string toString(const FileFormat &format) {
     switch (format) {
         case FileFormat::OpenQASM:
             return "OPENQASM";
+        case FileFormat::OpenQASM3:
+            return "OPENQASM3";
         case FileFormat::Real:
             return "REAL";
         default:
-            throw std::invalid_argument("Invalid RotationType!");
+            throw std::invalid_argument("Invalid FileFormat!");
     }
 }
 
@@ -233,6 +237,151 @@ inline std::string rtrim(const std::string &s) {
 inline double round_sig(double num, int sig) {
     return static_cast<double>(static_cast<int>(num * pow(10, sig))) / pow(10, sig);
 }
+
+// Assertions
+enum AssertKey : std::uint8_t { // Assertion Keywords
+    none,
+    classic_concrete,
+    classic_symbolic,
+    superposition_concrete,
+    superposition_symbolic,
+    equivalence,
+    phase_concrete,
+    phase_symbolic,
+    assume_classic,
+    assume_phase,
+    declare
+};
+struct AssertionInfo {
+    AssertKey type;
+    QubitSet assert_qubits;
+    QubitSet ancilla_qubits;
+    CbitSet assert_cbits;
+    std::string argument;
+    AssertionInfo() : type(none) {}
+    std::string getArgument() const {
+        return argument;
+    }
+    QubitSet getQubits() const {
+        return assert_qubits;
+    }
+    CbitSet getCbits() const {
+        return assert_cbits;
+    }
+    bool isValid() const {
+        return type != none;
+    }
+    bool isSymbolic() const {
+        return type == classic_symbolic || type == superposition_symbolic || type == phase_symbolic || type == assume_classic || type == assume_phase || type == declare;
+    }
+    bool isAssumption() const {
+        return type == assume_phase || type == assume_classic || type == declare;
+    }
+};
+
+enum ConditionType : std::uint8_t { // Condition Type
+    invalid,
+    eq, // ==
+    neq, // !=
+    le, // <=
+    lt, // <
+    ge, // >=
+    gt  // >
+};
+
+// classical condition state (for flattening if/else)
+struct ClassicalCondition {
+    ConditionType type=ConditionType::invalid;
+    std::string cbit="c"; // lhs: creg name or c[0]
+    unsigned value=0; // rhs: number
+
+    explicit ClassicalCondition(std::string c) : type(eq), cbit(std::move(c)), value(1) {}
+    ClassicalCondition(std::string c, const unsigned value) : type(eq), cbit(std::move(c)), value(value) {}
+    ClassicalCondition(const ConditionType t, const std::string &c, const unsigned v) : type(t), cbit(std::move(c)), value(v) {}
+    ClassicalCondition() = default;
+
+    bool isActive() const {
+        return type != invalid;
+    }
+
+    ConditionType getType() const {
+        return type;
+    }
+
+    std::string getCbit() const {
+        return cbit;
+    }
+
+    unsigned getValue() const {
+        return value;
+    }
+
+    ClassicalCondition negate() const {
+        ConditionType negate;
+        switch(type) {
+            case invalid:
+                return {};
+            case eq:
+                if(value == 0) return {type, cbit, 1};
+                if(value == 1) return {type, cbit, 0};
+                negate = neq;
+                break;
+            case neq:
+                if(value == 0) return {type, cbit, 1};
+                if(value == 1) return {type, cbit, 0};
+                negate = eq;
+                break;
+            case le:
+                negate = gt;
+                break;
+            case lt:
+                negate = ge;
+                break;
+            case ge:
+                negate = lt;
+                break;
+            case gt:
+                negate = le;
+                break;
+            default:
+                throw std::invalid_argument("Invalid classical condition type!");
+        }
+        return {negate, cbit, value};
+    }
+
+    std::string toString() const {
+        std::string op;
+        switch(type) {
+            case invalid:
+                return "";
+            case eq:
+                op = "==";
+                break;
+            case neq:
+                op = "!=";
+                break;
+            case lt:
+                op = "<";
+                break;
+            case le:
+                op = "<=";
+                break;
+            case gt:
+                op = ">";
+                break;
+            case ge:
+                op = ">=";
+                break;
+            default:
+                throw std::invalid_argument("Invalid classical condition type!");
+        }
+        return "if (" + cbit + " " + op + " " + std::to_string(value) + ") ";
+    }
+
+    bool operator==(const ClassicalCondition &rhs) const {
+        return this->type == rhs.type && this->cbit == rhs.cbit && this->value == rhs.value;
+    }
+};
 
 }  // namespace qcore
 

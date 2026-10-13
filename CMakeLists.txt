@@ -1,4 +1,19 @@
 cmake_minimum_required(VERSION 3.15)
+# add_compile_options(-fsanitize=address -g)
+# add_link_options(-fsanitize=address -g)
+
+option(BUILD_TESTS "Build tests" ON)
+option(BINDINGS "Configure for building Python bindings" OFF)
+
+set(QCORE_LIBRARY_TYPE "SHARED" CACHE STRING "QCore library linking")
+
+if (BINDINGS)
+  set(QCORE_LIBRARY_TYPE STATIC)
+endif()
+
+# qcore requires at least C++20
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(
     qcore 
@@ -23,17 +38,11 @@ check_submodule_present(json)
 add_subdirectory(src)
 
 # add Python binding code
-option(BINDINGS "Configure for building Python bindings" OFF)
 if(BINDINGS)
     check_submodule_present(pybind11)
     check_submodule_present(pybind11_json)
     add_subdirectory(qcore)
 endif()
-
-# googletest
-# GoogleTest requires at least C++17
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -47,13 +56,28 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-add_executable(
-        DecomposeTest
-        test/DecomposeTest.cpp
-)
+if(BUILD_TESTS)
+include(GoogleTest)
 
-target_link_libraries(
-        DecomposeTest
-        PRIVATE
-        ${PROJECT_NAME}
+# add tests
+
+macro(QCORE_TEST NAME)
+add_executable(
+        ${NAME}
+        ${ARGN}
 )
+target_link_libraries(
+        ${NAME}
+        PRIVATE
+        GTest::gtest_main
+        qcore
+)
+gtest_discover_tests(${NAME})
+endmacro()
+
+qcore_test(
+  qcore_test
+  test/decompose/Clifford_T.cpp
+  test/internal_representation/internal_representation_test.cpp
+)
+endif()

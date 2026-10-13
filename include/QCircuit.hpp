@@ -35,10 +35,15 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <utility>
 
+#include "Definition.hpp"
 #include "QGate.hpp"
+#include "GateLibrary.hpp"
 
 namespace qcore {
+
+class GateLibrary;
 
 void exchangeQubits(QubitSet& qubits, int i, int j);
 
@@ -53,6 +58,11 @@ class QCircuit {
 
     QubitDepthMap depth;
     PropertiesMap properties;
+    std::map<std::string, std::shared_ptr<QCircuit>> gate_definitions;
+    std::map<std::string, GateDefinition> gate_def_text;
+    std::shared_ptr<GateLibrary> gate_library_;
+    FileFormat source_format_ = FileFormat::OpenQASM;
+    regsize_t max_ancilla;
 
    public:
     QCircuit();
@@ -68,10 +78,28 @@ class QCircuit {
     void init();
 
     void clone(const QCircuit& ckt);
+    void cloneEmpty(const QCircuit& ckt);
+
+    FileFormat readQCircuitFromString(const std::string &string) {
+        std::stringstream ss(string);
+        readQASM3(ss);
+        return FileFormat::OpenQASM3;
+    };
+
+    std::string writeQCircuitToString() {
+        std::stringstream ss;
+        writeQASM3(ss);
+        return ss.str();
+    };
+
+    FileFormat writeQCircuitToString(const std::string& string);
 
     FileFormat readQCircuit(const std::string& filename);
 
     FileFormat writeQCircuit(const std::string& filename);
+
+    FileFormat getSourceFormat() const { return source_format_; }
+    void setSourceFormat(FileFormat fmt) { source_format_ = fmt; }
 
     void readQASM(std::istream& is);
 
@@ -106,6 +134,8 @@ class QCircuit {
      */
     void addQCircuit(QCircuit qc);
 
+	void addQCircuit(QCircuit qc, ClassicalCondition cond);
+
     /** @brief Merging two quantum circuits
      *
      *
@@ -126,12 +156,28 @@ class QCircuit {
 
     void setQubits(const QubitSet& qubits); 
 
-    inline void setQreg(register_t qreg) {
+    inline void setQreg(regsize_t qreg) {
         this->qreg = qreg;
+    }
+
+    inline void setCreg(regsize_t creg) {
+        this->creg = creg;
     }
 
     inline QGateSet& getGates() {
         return this->gates;
+    }
+
+    inline const QGateSet& getGates() const {
+        return this->gates;
+    }
+
+    inline void setGates(QGateSet &gates) {
+        this->gates = std::move(gates);
+    }
+
+    inline void addGate(std::unique_ptr<QGate> &gate) {
+        this->gates.push_back(std::move(gate));
     }
 
     inline QubitSet& getQubits() {
@@ -154,10 +200,69 @@ class QCircuit {
         return this->max_gate_size;
     }
 
+    inline void setMaxGateSize(gsize_t max_gate_size) {
+        this->max_gate_size = max_gate_size;
+    }
+
     depth_t getDepth();
 
     inline PropertiesMap& getProperties() {
         return this->properties;
+    }
+
+    inline void setProperty(GateType type, gcount_t prop) {
+        this->properties[type] = prop;
+    }
+
+    inline gcount_t getProperty(GateType type) {
+        return this->properties[type];
+    }
+
+    inline void setMaxNumAncilla(regsize_t max_ancilla) {
+        this->max_ancilla = max_ancilla;
+    }
+
+    inline regsize_t getMaxNumAncilla() const {
+        return max_ancilla;
+    }
+
+    /** @brief Register a named subcircuit definition for later use
+     *  @param name The gate name
+     *  @param body The subcircuit body (using local qubit indices 0..n-1)
+     */
+    void defineGate(const std::string& name, std::shared_ptr<QCircuit> body);
+
+    /** @brief Add a SUBCIRCUIT gate that invokes a previously defined gate
+     *  @param name The gate name (must have been defined via defineGate)
+     *  @param qubits The actual qubits this gate operates on
+     *  @param inverse Invert the custom circuit?
+     */
+    void addSubcircuitGate(const std::string& name, const QubitSet& qubits, bool inverse, const ClassicalCondition &cond);
+
+    /** @brief Get the map of defined gate names to their body circuits */
+    inline const std::map<std::string, std::shared_ptr<QCircuit>>& getGateDefinitions() const {
+        return this->gate_definitions;
+    }
+
+    /** @brief Register a named subcircuit definition for later use
+     *  @param name The gate name
+     *  @param body The textual definition
+     */
+    void defineGateTxt(const std::string& name, GateDefinition body) {
+        this->gate_def_text[name] = std::move(body);
+    }
+
+    /** @brief Get the map of defined gate names to their body circuits */
+    inline const std::map<std::string, GateDefinition>& getGateDefTxts() const {
+        return this->gate_def_text;
+    }
+
+    /** @brief Set a shared gate library for predefined custom gates */
+    void setGateLibrary(std::shared_ptr<GateLibrary> lib);
+
+    /** @brief Get the shared gate library. The returned library may be shared by many circuits */
+    inline std::shared_ptr<const GateLibrary> getGateLibrary() const {
+        return this->gate_library_;
     }
 
     /*
@@ -183,6 +288,11 @@ class QCircuit {
     void clear();*/
     friend void exchangeQubits(QubitSet& qubits, int i, int j);
 };
+
+void addGate(gate_t type, gsize_t size, const CbitSet& cbits,
+              const RotationMap& angles, const ControlSet& controls,
+              const TargetSet& targets, const ClassicalCondition& cond,
+              AssertionInfo& assertion, QCircuit &circuit);
 
 /** @brief merging qubits from multiple sources eliminating duplicates.
  *

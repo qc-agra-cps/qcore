@@ -53,6 +53,8 @@ class CMakeBuild(build_ext):
             f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
             f"-DQCORE_VERSION_INFO={version}",
             "-DBINDINGS=ON",
+            "-DCMAKE_BUILD_RPATH_USE_ORIGIN=ON",
+            "-DBUILD_TESTS=OFF",
         ]
         build_args = []
 
@@ -127,6 +129,9 @@ class CMakeBuild(build_ext):
 setup(
     name="qcore",
     version="0.0.1",
+    install_requires=[],
     ext_modules=[CMakeExtension("pyqcore")],
     cmdclass={"build_ext": CMakeBuild},
+    packages=['qcore'],
+    package_dir={'': 'python'},
 )

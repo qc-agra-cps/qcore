@@ -162,6 +162,7 @@ void QCircuit::readQASM(std::istream& is) {
         {"cry", GateType::CRY},
         {"z", GateType::Z},
         {"cz", GateType::CZ},
+        {"cciz", GateType::CCIZ},
         {"p", GateType::P},
         {"cp", GateType::CP},
         {"s", GateType::S},
@@ -206,13 +207,15 @@ void QCircuit::readQASM(std::istream& is) {
     };
 
     static std::map<GateGroup, std::regex> gateGroup_map{
-        {GateGroup::ZERO, std::regex("^\\s*([a-z]*[0-9]*)\\s*([A-Za-z][A-Za-z0-9]*\\[[0-9]+\\].*);\\s*$")},
-        {GateGroup::ONE, std::regex("^\\s*([a-z]*[0-9]*)\\(\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*\\)(.*);\\s*$")},
-        {GateGroup::TWO, std::regex("^\\s*([a-z]*[0-9]*)\\(\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*,\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*\\)(.*);\\s*$")},
-        {GateGroup::THREE, std::regex("^\\s*([a-z]*[0-9]*)\\(\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*,\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*,\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*\\)(.*);\\s*$")},
-        {GateGroup::FOUR, std::regex("^\\s*([a-z]*[0-9]*)\\(\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*,\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*,\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*,\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*\\)(.*);\\s*$")},
+        {GateGroup::ZERO, std::regex("^\\s*([a-z0-9]+)\\s*([A-Za-z][A-Za-z0-9]*\\[[0-9]+\\].*);\\s*$")},
+        {GateGroup::ONE, std::regex("^\\s*([a-z0-9]+)\\(\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*\\)(.*);\\s*$")},
+        {GateGroup::TWO, std::regex("^\\s*([a-z0-9]+)\\(\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*,\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*\\)(.*);\\s*$")},
+        {GateGroup::THREE, std::regex("^\\s*([a-z0-9]+)\\(\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*,\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*,\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*\\)(.*);\\s*$")},
+        {GateGroup::FOUR, std::regex("^\\s*([a-z0-9]+)\\(\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*,\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*,\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*,\\s*(pi\\s*/?\\s*[0-9]*?|[0-9]*\\.[0-9]+)\\s*\\)(.*);\\s*$")},
         {GateGroup::MEASURE, std::regex("^\\s*(measure)\\s*([A-Za-z][A-Za-z0-9]*\\[[0-9]+\\])\\s*->\\s*[A-Za-z][A-Za-z0-9]*(\\[[0-9]+\\])\\s*;\\s*$")}};
 
+    bool qreg_read=false; // internally does not distinguish qregs => only one possible TODO remove when supported
+    bool creg_read=false; // internally does not distinguish cregs => only one possible TODO remove when supported
     std::smatch gateTokens;
     std::string nextToken;
     int line = 0;
@@ -249,22 +252,28 @@ void QCircuit::readQASM(std::istream& is) {
         }
 
         else if (header_map[nextToken] == HeaderKey::QREG) {
+            if(qreg_read) {
+                throw QcoreException("[readQASM] l:" + std::to_string(line) + " msg: Currently does not support multiple qregs");
+            }
             if (!static_cast<bool>(std::getline(is, nextToken))) {
                 throw QcoreException("[readQASM] l:" + std::to_string(line) + " msg: Failed to read gate");
             }
 
             this->qreg = std::stoull(std::regex_replace(nextToken, std::regex("^.*\\[([0-9]*)\\].*$"), "$1"));
-
+            qreg_read = true;
             continue;  // quantum register length
         }
 
         else if (header_map[nextToken] == HeaderKey::CREG) {
+            if(creg_read) {
+                throw QcoreException("[readQASM] l:" + std::to_string(line) + " msg: Currently does not support multiple cregs");
+            }
             if (!static_cast<bool>(std::getline(is, nextToken))) {
                 throw QcoreException("[readQASM] l:" + std::to_string(line) + " msg: Failed to read gate");
             }
 
             this->creg = std::stoull(std::regex_replace(nextToken, std::regex("^.*\\[([0-9]*)\\].*$"), "$1"));
-
+            creg_read = true;
             continue;  // classical register length
         }
 
@@ -272,7 +281,7 @@ void QCircuit::readQASM(std::istream& is) {
 
             std::string qgate{};
             is_classical classical = false;
-            expression_t expression{};
+            ClassicalCondition condition{};
             if (gateType_map[ltrim(rtrim(nextToken))] == GateType::IF) {
                 classical = true;
             }
@@ -287,7 +296,9 @@ void QCircuit::readQASM(std::istream& is) {
             qgate += " " + nextToken;
 
             if (classical && std::regex_match(qgate, gateTokens, std::regex("^\\s*\\(\\s*[A-Za-z][A-Za-z0-9]*\\s*==\\s*([0-9]+)\\s*\\).*$"))) {
-                expression = gateTokens[1];
+                condition.type = eq;
+                condition.cbit = "c"; // use "c" name internally
+                condition.value = static_cast<unsigned>(std::stoul(gateTokens[1]));
                 qgate = std::regex_replace(qgate, std::regex("^\\s*\\((\\s*[A-Za-z][A-Za-z0-9]*\\s*==\\s*[0-9]+\\s*)\\)(.*)$"), "$2");
             }
 
@@ -520,9 +531,8 @@ void QCircuit::readQASM(std::istream& is) {
 
             auto gatePtr = QGatePtr(new QGate(gate_type, gate_size, cbits, angles, controls, targets));
 
-            gatePtr->setIsClassical(classical);
             if (classical) {
-                gatePtr->setExpression(expression);
+                gatePtr->setClassical(condition);
             }
 
             this->gates.push_back(std::move(gatePtr));
@@ -571,54 +581,81 @@ void QCircuit::writeQASM(std::ostream& os) {
 
 }
 
-std::string QGate::toOpenQASM() {
+std::string QGate::toOpenQASM(const std::vector<std::string>& qargs) {
     std::string gateString{};
 
-    if (this->flag) {
-        gateString += "if ( c == " + this->expression + " ) ";
+    gateString += this->classical.toString();
+
+    if (this->gate_type == GateType::SUBCIRCUIT) {
+        gateString += this->custom_gate_name;
+        if (!this->call_params.empty()) {
+            gateString += "( ";
+            for (size_t i = 0; i < this->call_params.size(); ++i) {
+                gateString += this->call_params[i];
+                if (i < this->call_params.size() - 1) gateString += ", ";
+            }
+            gateString += " )";
+        }
+        for (size_t i = 0; i < this->targets.size(); ++i) {
+            gateString += " " + (qargs.empty() ? "q[" + std::to_string(this->targets[i]) + "]" : qargs[this->targets[i]]);
+            if (i < this->targets.size() - 1) gateString += ",";
+        }
+        gateString += ";";
+        return gateString;
     }
 
     gateString += qcore::toString(this->gate_type);
+
+    if(this->gate_type == GateType::ASSERT_EQ) {
+        gateString += " " + assertion.argument;
+        gateString += ";";
+        return gateString;
+    }
 
     if (this->angles.size() != 0) {
         gateString += "( ";
 
         if (this->angles.find(RotationType::THETA) != this->angles.end()) {
-            gateString += this->angles[RotationType::THETA];
+			gateString += normalizeRotationParameters(this->angles[RotationType::THETA]);
             if (this->angles.find(RotationType::PHI) != this->angles.end()) {
                 gateString += ", ";
             }
         }
 
         if (this->angles.find(RotationType::PHI) != this->angles.end()) {
-            gateString += this->angles[RotationType::PHI];
+			gateString += normalizeRotationParameters(this->angles[RotationType::PHI]);
             if (this->angles.find(RotationType::LAMBDA) != this->angles.end()) {
                 gateString += ", ";
             }
         }
 
         if (this->angles.find(RotationType::LAMBDA) != this->angles.end()) {
-            gateString += this->angles[RotationType::LAMBDA];
+			gateString += normalizeRotationParameters(this->angles[RotationType::LAMBDA]);
             if (this->angles.find(RotationType::GAMMA) != this->angles.end()) {
                 gateString += ", ";
             }
         }
 
         if (this->angles.find(RotationType::GAMMA) != this->angles.end()) {
-            gateString += this->angles[RotationType::GAMMA];
+			gateString += normalizeRotationParameters(this->angles[RotationType::GAMMA]);
         }
         gateString += " )";
     }
 
-    for (ConstantQubitIterator q = this->controls.cbegin(); q != this->controls.cend(); q++) {
-        gateString += " q[" + std::to_string(*q) + "],";
+    for (unsigned q=0; q<this->controls.size(); ++q) {
+        gateString += " " + (qargs.empty() ? "q[" + std::to_string(this->controls[q]) + "]" : qargs[this->controls[q]]) + ",";
     }
 
-    for (ConstantQubitIterator q = this->targets.cbegin(); q != this->targets.cend(); q++) {
-        gateString += " q[" + std::to_string(*q) + "]";
+    for (unsigned q=0; q<this->targets.size(); ++q) {
+        gateString += " " + (qargs.empty() ? "q[" + std::to_string(this->targets[q]) + "]" : qargs[this->targets[q]]);
 
-        if (q != this->targets.cend() - 1) {
+        if (q != this->targets.size() - 1) {
             gateString += ",";
+        }
+
+        else if (this->gate_type == GateType::ASSERT_C) {
+            gateString += " == |" + assertion.argument + ">;";
+            return gateString;
         }
 
         else if (this->gate_type != GateType::MEASURE) {
@@ -630,7 +667,10 @@ std::string QGate::toOpenQASM() {
         gateString += " -> c[" + std::to_string(*c) + "]"; 
     }
 
-    if (this->gate_type == GateType::MEASURE) {
+    if (this->gate_type == GateType::MEASURE || this->targets.size() == 0) {
+        if (this->gate_type == GateType::BARRIER) {
+			gateString += " q";
+		}
         gateString += ";";
     }
 
